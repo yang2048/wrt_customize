@@ -36,32 +36,68 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Free disk space
-        uses: sbwml/actions@free-disk
+      - name: Check Server Performance(检查服务器性能)
+        run: |
+          echo "警告⚠"
+          echo "分配的服务器性能有限，若选择的插件过多，务必注意CPU性能！"
+          echo -e "已知CPU型号（降序）：7763，8370C，8272CL，8171M，E5-2673 \n"
+          echo "--------------------------CPU信息--------------------------"
+          echo "CPU物理数量：$(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
+          echo -e "CPU核心信息：$(cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c) \n"
+          echo "--------------------------内存信息--------------------------"
+          echo "已安装内存详细信息："
+          echo -e "$(sudo lshw -short -C memory | grep GiB) \n"
+          echo "--------------------------硬盘信息--------------------------"
+          echo "硬盘数量：$(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+          echo "--------------------------清理硬盘--------------------------"
+          sudo apt-get -y purge firefox google* mongo* mysql* php*
+          sudo apt-get -y autoremove --purge
+          sudo apt-get clean
+          sudo rm -rf /etc/mysql /etc/php /usr/local /usr/src/* /var/lib/gems /var/lib/mysql /opt/{microsoft,az,hostedtoolcache,cni,mssql-tools} /usr/share/{az*,dotnet,swift,miniconda,gradle*,java,kotlinc,ri,sbt} /root/{.sbt,.local,.npm} /home/linuxbrew
+          sudo sed -i '/NVM_DIR/d;/skel/d' /root/{.bashrc,.profile}
+          echo "::endgroup::"
 
-      - name: Build System Setup
+      - name: Combine Disks(合并并释放磁盘)
+        uses: easimon/maximize-build-space@master
+        with:
+          swap-size-mb: 4096
+          temp-reserve-mb: 500
+          root-reserve-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-docker-images: 'true'
+          # remove-haskell: 'true'
+
+      - name: Build System Setup(系统环境设置)
         run: |
           sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-          sudo -E apt -yqq install dos2unix
-          sudo -E apt -yqq install libfuse-dev
-          sudo -E apt -yqq autoremove --purge
+          sudo -E apt -yqq install dos2unix libfuse-dev
           sudo -E apt -yqq autoclean
           sudo -E apt -yqq clean
           sudo -E systemctl daemon-reload
 
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set Build Date and Timezone
+      - name: Set Build Date and Timezone(设置编译日期和时区)
         run: |
-          sudo -E timedatectl set-timezone "Asia/Shanghai"
+          sudo -E timedatectl set-timezone "$TZ"
           export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
           echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
 
-      - name: Pre Clone
+      - name: Checkout(检出代码)
+        uses: actions/checkout@v4
+
+      - name: Check Server Performance(检查服务器可以空间)
+        run: |
+          echo "⚠"
+          echo "--------------------------内存信息--------------------------"
+          echo "已安装内存详细信息："
+          echo -e "$(sudo lshw -short -C memory | grep GiB) \n"
+          echo "--------------------------硬盘信息--------------------------"
+          echo "硬盘数量：$(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+
+      - name: Pre Clone(预克隆脚本)
         run: ./pre_clone_action.sh ${{ inputs.model }}
 
-      - name: Cache Dependencies
+      - name: Cache Dependencies(缓存依赖)
         uses: actions/cache@v4
         with:
           path: |
@@ -71,7 +107,7 @@ jobs:
           restore-keys: |
             ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-
 
-      - name: Refresh the cache
+      - name: Refresh the cache(刷新缓存)
         run: |
           if [ -d "./action_build/staging_dir" ]; then
             find "./action_build/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r dir; do
@@ -79,10 +115,10 @@ jobs:
             done
           fi
 
-      - name: Build Firmware
+      - name: Build Firmware(构建固件)
         run: ./build.sh ${{ inputs.model }}
-
-      - name: Delete Old Cache
+   
+      - name: Delete Old Cache(删除旧缓存)
         run: |
           # 获取缓存列表并删除
           gh cache list --key ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}- --json key --jq '.[] | .key' | while read -r key; do
@@ -92,16 +128,17 @@ jobs:
           echo "========cache status========"
           echo "ccache: $(du -sh ./action_build/.ccache | cut -f 1)"
           echo "staging: $(du -sh ./action_build/staging_dir | cut -f 1)"
-
-      - name: Machine Information
+      
+      - name: Machine Information(检查空间使用情况)
         run: |
+          echo "⚠"
           echo "=============================================="
           lscpu | grep -E "name|Core|Thread"
           echo "=============================================="
-          df -h
+          df -hT
           echo "=============================================="
-
-      - name: Upload Firmware
+       
+      - name: Upload Firmware(上传固件)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BUILD_DATE }}_${{ inputs.model }}

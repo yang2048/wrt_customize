@@ -33,12 +33,17 @@ REPO_URL=$1
 REPO_BRANCH=$2
 BUILD_DIR=$3
 COMMIT_HASH=$4
+CONFIG_FILE=$5
+DISABLED_FUNCTIONS=$6
+ENABLED_FUNCTIONS=$7
+KERNEL_VERMAGIC=$8
+KERNEL_MODULES=$9
 
 FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
 GOLANG_BRANCH="25.x"
 THEME_SET="argon"
-LAN_ADDR="192.168.1.1"
+LAN_ADDR="192.168.10.1"
 
 clone_repo() {
     if [[ ! -d $BUILD_DIR ]]; then
@@ -48,6 +53,12 @@ clone_repo() {
             exit 1
         fi
     fi
+    # if [[ "$Build_Mod" == "container" ]]; then
+    #     rm -rf "$BUILD_DIR/staging_dir"
+    #     rm -rf "$BUILD_DIR/build_dir"
+    #     ln -sf /home/build/immortalwrt/build_dir "$BUILD_DIR/build_dir"
+    #     ln -sf /home/build/immortalwrt/staging_dir "$BUILD_DIR/staging_dir"
+    # fi
 }
 
 clean_up() {
@@ -77,14 +88,27 @@ reset_feeds_conf() {
 update_feeds() {
     # 删除注释行
     sed -i '/^#/d' "$BUILD_DIR/$FEEDS_CONF"
-
+    add_feeds() {
+        local feed=$1
+        local url=$2
+        if ! grep -q "$feed" "$BUILD_DIR/$FEEDS_CONF"; then
+            # 确保文件以换行符结尾
+            [ -z "$(tail -c 1 "$BUILD_DIR/$FEEDS_CONF")" ] || echo "" >>"$BUILD_DIR/$FEEDS_CONF"
+            echo "src-git $feed $url" >>"$BUILD_DIR/$FEEDS_CONF"
+        fi
+    }
     # 检查并添加 small-package 源
-    if ! grep -q "small-package" "$BUILD_DIR/$FEEDS_CONF"; then
-        # 确保文件以换行符结尾
-        [ -z "$(tail -c 1 "$BUILD_DIR/$FEEDS_CONF")" ] || echo "" >>"$BUILD_DIR/$FEEDS_CONF"
-        echo "src-git small8 https://github.com/kenzok8/small-package" >>"$BUILD_DIR/$FEEDS_CONF"
-    fi
-
+    # add_feeds "small8" "https://github.com/kenzok8/small-package"
+    # 检查并添加 kwrt 源
+    add_feeds "kiddin9" "https://github.com/kiddin9/kwrt-packages.git"
+    # 检查并添加 AWG-OpenWRT 源
+    add_feeds "awg" "https://github.com/Slava-Shchipunov/awg-openwrt"
+    # 检查并添加 opentopd 源
+    # add_feeds "opentopd" "https://github.com/sirpdboy/sirpdboy-package"
+    # 检查并添加 node 源
+    # add_feeds "node" "https://github.com/nxhack/openwrt-node-packages.git;openwrt-24.10"
+    # 检查并添加 libremesh 源
+    # add_feeds "libremesh" "https://github.com/libremesh/lime-packages"
     # 添加bpf.mk解决更新报错
     if [ ! -f "$BUILD_DIR/include/bpf.mk" ]; then
         touch "$BUILD_DIR/include/bpf.mk"
@@ -107,21 +131,23 @@ remove_unwanted_packages() {
         "luci-app-passwall" "luci-app-ddns-go" "luci-app-rclone" "luci-app-ssr-plus"
         "luci-app-vssr" "luci-app-daed" "luci-app-dae" "luci-app-alist" "luci-app-homeproxy"
         "luci-app-haproxy-tcp" "luci-app-openclash" "luci-app-mihomo" "luci-app-appfilter"
-        "luci-app-msd_lite"
+        "luci-app-msd_lite" "luci-app-passwall2"
     )
     local packages_net=(
-        "haproxy" "xray-core" "xray-plugin" "dns2socks" "alist" "hysteria"
-        "mosdns" "adguardhome" "ddns-go" "naiveproxy" "shadowsocks-rust"
-        "sing-box" "v2ray-core" "v2ray-geodata" "v2ray-plugin" "tuic-client"
+        "xray-core" "xray-plugin" "dns2socks" "alist" "hysteria" "geoview"
+        "mosdns" "ddns-go" "naiveproxy" "shadowsocks-rust" "sing-box" "v2ray-plugin" "tuic-client"
         "chinadns-ng" "ipt2socks" "tcping" "trojan-plus" "simple-obfs" "shadowsocksr-libev" 
-        "dae" "daed" "mihomo" "geoview" "tailscale" "open-app-filter" "msd_lite"
+        "dae" "daed" "mihomo" "tailscale" "open-app-filter" "msd_lite"
     )
     local packages_utils=(
         "cups"
     )
     local small8_packages=(
         "ppp" "firewall" "dae" "daed" "daed-next" "libnftnl" "nftables" "dnsmasq" "luci-app-alist"
-        "alist" "opkg" "smartdns" "luci-app-smartdns"
+        "alist" "opkg" "smartdns" "luci-app-smartdns" "tcping" "nikki"
+    )
+    local kiddin9_packages=(
+        
     )
 
     for pkg in "${luci_packages[@]}"; do
@@ -148,6 +174,12 @@ remove_unwanted_packages() {
     for pkg in "${small8_packages[@]}"; do
         if [[ -d ./feeds/small8/$pkg ]]; then
             \rm -rf ./feeds/small8/$pkg
+        fi
+    done
+
+    for pkg in "${kiddin9_packages[@]}"; do
+        if [[ -d ./feeds/kiddin9/$pkg ]]; then
+            \rm -rf ./feeds/kiddin9/$pkg
         fi
     done
 
@@ -178,24 +210,43 @@ update_golang() {
 }
 
 install_small8() {
-    ./scripts/feeds install -p small8 -f xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
-        naiveproxy shadowsocks-rust sing-box v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin \
-        tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev \
-        luci-app-passwall v2dat mosdns luci-app-mosdns adguardhome luci-app-adguardhome ddns-go \
+    ./scripts/feeds install -p small8 -f luci-app-passwall mosdns luci-app-mosdns adguardhome luci-app-adguardhome ddns-go \
         luci-app-ddns-go taskd luci-lib-xterm luci-lib-taskd luci-app-store quickstart \
-        luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest netdata luci-app-netdata \
-        lucky luci-app-lucky luci-app-openclash luci-app-homeproxy luci-app-amlogic nikki luci-app-nikki \
-        tailscale luci-app-tailscale oaf open-app-filter luci-app-oaf easytier luci-app-easytier \
+        luci-app-quickstart luci-app-istorex netdata luci-app-netdata \
+        lucky luci-app-lucky luci-app-openclash  luci-app-amlogic nikki luci-app-nikki \
+        oaf open-app-filter luci-app-oaf easytier luci-app-easytier \
         msd_lite luci-app-msd_lite cups luci-app-cupsd
 }
 
 install_fullconenat() {
     if [ ! -d $BUILD_DIR/package/network/utils/fullconenat-nft ]; then
-        ./scripts/feeds install -p small8 -f fullconenat-nft
+        ./scripts/feeds install -p kiddin9 -f fullconenat-nft
     fi
     if [ ! -d $BUILD_DIR/package/network/utils/fullconenat ]; then
-        ./scripts/feeds install -p small8 -f fullconenat
+        ./scripts/feeds install -p kiddin9 -f fullconenat
     fi
+}
+
+install_opentopd() {
+    # \rm -rf ./feeds/opentopd/luci-app-advancedplus
+    # git clone --depth=1 https://github.com/sirpdboy/luci-app-advancedplus.git ./feeds/opentopd/luci-app-advancedplus
+    ./scripts/feeds install -p opentopd -f cpulimit luci-app-cpulimit luci-app-advanced
+}
+
+install_kiddin9() {
+    ./scripts/feeds install -p kiddin9 -f xray-core xray-plugin dns2tcp dns2socks hysteria naiveproxy shadowsocks-rust sing-box \
+        v2ray-plugin tuic-client chinadns-ng ipt2socks geoview tcping trojan-plus simple-obfs shadowsocksr-libev v2dat luci-lib-xterm \
+        luci-app-advancedplus luci-app-unishare unishare taskd luci-lib-taskd luci-app-store quickstart luci-app-quickstart \
+        lucky luci-app-lucky luci-app-openclash luci-app-amlogic oaf open-app-filter luci-app-oaf easytier luci-app-easytier \
+        tailscale luci-app-tailscale luci-theme-argon luci-app-samba4 mosdns luci-app-mosdns luci-app-wol mihomo \
+        luci-app-adguardhome luci-app-taskplan
+}
+
+install_node() {
+    ./scripts/feeds update node
+    \rm -rf ./package/feeds/packages/node
+    \rm -rf ./package/feeds/packages/node-*
+    ./scripts/feeds install -a -p node
 }
 
 check_default_settings() {
@@ -227,11 +278,19 @@ install_feeds() {
     for dir in $BUILD_DIR/feeds/*; do
         # 检查是否为目录并且不以 .tmp 结尾，并且不是软链接
         if [ -d "$dir" ] && [[ ! "$dir" == *.tmp ]] && [ ! -L "$dir" ]; then
-            if [[ $(basename "$dir") == "small8" ]]; then
+            dir_name=$(basename "$dir")
+            if [[ "$dir_name" == "small8" ]]; then
                 install_small8
                 install_fullconenat
+            elif [[ "$dir_name" == "opentopd" ]]; then
+                install_opentopd
+            elif [[ "$dir_name" == "kiddin9" ]]; then
+                install_kiddin9
+                echo "已安装 kiddin9 必需软件包"
+            elif [[ "$dir_name" == "node" ]]; then
+                install_node
             else
-                ./scripts/feeds install -f -ap $(basename "$dir")
+                ./scripts/feeds install -ap $(basename "$dir")
             fi
         fi
     done
@@ -526,9 +585,10 @@ update_nss_pbuf_performance() {
 }
 
 set_build_signature() {
+    date_version=$(date +"%y.%m.%d")
     local file="$BUILD_DIR/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js"
     if [ -d "$(dirname "$file")" ] && [ -f $file ]; then
-        sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ build by ZqinKing')/g" "$file"
+        sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ build by Y.Y R$date_version')/g" "$file"
     fi
 }
 
@@ -549,6 +609,37 @@ update_menu_location() {
     local tailscale_path="$BUILD_DIR/feeds/small8/luci-app-tailscale/root/usr/share/luci/menu.d/luci-app-tailscale.json"
     if [ -d "$(dirname "$tailscale_path")" ] && [ -f "$tailscale_path" ]; then
         sed -i 's/services/vpn/g' "$tailscale_path"
+    fi
+
+    # passwall
+    local passwall_path="$BUILD_DIR/package/feeds/small8/luci-app-passwall/luasrc/controller/passwall.lua"
+    if [ -d "${passwall_path%/*}" ] && [ -f "$passwall_path" ]; then
+        local pos=$(grep -n "entry" "$passwall_path" | head -n 1 | awk -F ":" '{print $1}')
+        if [ -n "$pos" ]; then
+            sed -i ''${pos}'i\	entry({"admin", "proxy"}, firstchild(), "Proxy", 30).dependent = false' "$passwall_path"
+            sed -i 's/"services"/"proxy"/g' "$passwall_path"
+        fi
+    fi
+    # passwall2
+    local passwall2_path="$BUILD_DIR/package/feeds/small8/luci-app-passwall2/luasrc/controller/passwall2.lua"
+    if [ -d "${passwall2_path%/*}" ] && [ -f "$passwall2_path" ]; then
+        local pos=$(grep -n "entry" "$passwall2_path" | head -n 1 | awk -F ":" '{print $1}')
+        if [ -n $pos ]; then
+            sed -i ''${pos}'i\	entry({"admin", "proxy"}, firstchild(), "Proxy", 30).dependent = false' "$passwall2_path"
+            sed -i 's/"services"/"proxy"/g' "$passwall2_path"
+        fi
+    fi
+
+    # homeproxy
+    local homeproxy_path="$BUILD_DIR/package/feeds/small8/luci-app-homeproxy/root/usr/share/luci/menu.d/luci-app-homeproxy.json"
+    if [ -d "${homeproxy_path%/*}" ] && [ -f "$homeproxy_path" ]; then
+        sed -i 's/\/services\//\/proxy\//g' "$homeproxy_path"
+    fi
+
+    # nikki
+    local nikki_path="$BUILD_DIR/package/feeds/small8/luci-app-nikki/root/usr/share/luci/menu.d/luci-app-nikki.json"
+    if [ -d "${nikki_path%/*}" ] && [ -f "$nikki_path" ]; then
+        sed -i 's/\/services\//\/proxy\//g' "$nikki_path"
     fi
 }
 
@@ -582,10 +673,12 @@ update_dnsmasq_conf() {
 
 # 更新版本
 update_package() {
-    local dir=$(find "$BUILD_DIR/package" \( -type d -o -type l \) -name "$1")
+    local dir=$(find "$BUILD_DIR/package/feeds" \( -type d -o -type l \) -name "$1")
     if [ -z "$dir" ]; then
+        echo "跳过更新软件包 $dir"
         return 0
     fi
+    echo "更新软件包 $dir"
     local branch="$2"
     if [ -z "$branch" ]; then
         branch="releases"
@@ -633,16 +726,34 @@ update_package() {
         PKG_SOURCE=${PKG_SOURCE//\$\(PKG_VERSION\)/$PKG_VER}
 
         local PKG_HASH
-        if ! PKG_HASH=$(curl -fsSL "$PKG_SOURCE_URL""$PKG_SOURCE" | sha256sum | cut -b -64); then
+        if ! PKG_HASH=$(curl -fsSL "$PKG_SOURCE_URL"/"$PKG_SOURCE" | sha256sum | cut -b -64); then
             echo "错误：从 $PKG_SOURCE_URL$PKG_SOURCE 获取软件包哈希失败" >&2
             return 1
         fi
 
+        local old_version=$(awk -F"=" '/PKG_VERSION:=/ {print $NF}' "$mk_path" | grep -oE "[\.0-9]{1,}" | head -1)
+        echo "当前版本: $old_version, 目标版本: $PKG_VER"
         sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:='$PKG_VER'/g' "$mk_path"
         sed -i 's/^PKG_HASH:=.*/PKG_HASH:='$PKG_HASH'/g' "$mk_path"
 
         echo "更新软件包 $1 到 $PKG_VER $PKG_HASH"
+    else
+        echo "错误：未找到 $1 的 Makefile" >&2
+        return 1
     fi
+}
+
+update_packages() {
+    # https://github.com/opencontainers/runc
+    update_package "runc" "releases" "v1.3.0" || exit 1
+    # https://github.com/containerd/containerd
+    update_package "containerd" "releases" "v1.7.28" || exit 1
+    # https://github.com/docker/cli
+    update_package "docker" "tags" "v28.5.1" || exit 1
+    # https://github.com/moby/moby
+    update_package "dockerd" "releases" "v28.5.1" || exit 1
+    # https://github.com/docker/compose
+    update_package "docker-compose" "releases" "v2.40.2" || exit 1
 }
 
 # 添加系统升级时的备份信息
@@ -654,6 +765,8 @@ function add_backup_info_to_sysupgrade() {
 /etc/AdGuardHome.yaml
 /etc/easytier
 /etc/lucky/
+/etc/lxc/
+/etc/ddns-go/
 EOF
     fi
 }
@@ -987,6 +1100,13 @@ remove_tweaked_packages() {
 }
 
 update_argon() {
+    # git clone --depth 1 https://github.com/LazuliKao/luci-theme-argon -b openwrt-24.10 ./feeds/luci/themes/luci-theme-argon-new
+    # rm -rf ./feeds/luci/themes/luci-theme-argon
+    # mv ./feeds/luci/themes/luci-theme-argon-new/luci-theme-argon ./feeds/luci/themes/luci-theme-argon
+    # rm -rf ./feeds/luci/applications/luci-app-argon-config
+    # mv ./feeds/luci/themes/luci-theme-argon-new/luci-app-argon-config ./feeds/luci/applications/luci-app-argon-config
+    # \rm -rf ./feeds/luci/themes/luci-theme-argon-new
+
     local repo_url="https://github.com/ZqinKing/luci-theme-argon.git"
     local dst_theme_path="$BUILD_DIR/feeds/luci/themes/luci-theme-argon"
     local tmp_dir
@@ -1031,14 +1151,135 @@ update_nginx_ubus_module() {
     fi
 }
 
+# 自定义脚本
+update_base_files() {
+    local base_files_path="$BUILD_DIR/package/base-files/files"
+    local uci_defaults_path="$base_files_path/etc/uci-defaults"
+    if [ -d "$uci_defaults_path" ]; then
+        cp -f "$BASE_PATH/uci-defaults/"* "$uci_defaults_path"
+    fi
+}
+
+add_ohmyzsh() {
+    local base_files_path="$BUILD_DIR/package/base-files/files"
+    echo "Adding oh-my-zsh"
+    mkdir -p "$base_files_path/root"
+    if [ -d "$base_files_path/root/.oh-my-zsh" ]; then
+        rm -rf "$base_files_path/root/.oh-my-zsh"
+    fi
+    # git clone https://mirror.nju.edu.cn/git/ohmyzsh.git "$base_files_path/root/.oh-my-zsh"
+    git clone --depth 1 https://github.com/ohmyzsh/ohmyzsh.git "$base_files_path/root/.oh-my-zsh"
+    if [ -f "$base_files_path/root/.zshrc" ]; then
+        rm "$base_files_path/root/.zshrc"
+    fi
+    cp "$base_files_path/root/.oh-my-zsh/templates/zshrc.zsh-template" "$base_files_path/root/.zshrc"
+    # echo "source /etc/profile" >> "$base_files_path/root/.zshrc"
+    sed -i "1i source /etc/profile" "$base_files_path/root/.zshrc"
+    # sed -i "s:/bin/ash:/usr/bin/zsh:g" "base_files_path/etc/passwd"
+
+    # add plugins
+    local plugins_dir="$base_files_path/root/.oh-my-zsh/custom/plugins"
+    mkdir -p "$plugins_dir"
+
+    echo "Installing zsh-autocomplete plugin..."
+    if [ ! -d "$plugins_dir/zsh-autocomplete" ]; then
+        git clone --depth 1 https://github.com/marlonrichert/zsh-autocomplete.git "$plugins_dir/zsh-autocomplete"
+    fi
+
+    echo "Installing zsh-autosuggestions plugin..."
+    if [ ! -d "$plugins_dir/zsh-autosuggestions" ]; then
+        git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git "$plugins_dir/zsh-autosuggestions"
+    fi
+
+    echo "Installing zsh-syntax-highlighting plugin..."
+    if [ ! -d "$plugins_dir/zsh-syntax-highlighting" ]; then
+        git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$plugins_dir/zsh-syntax-highlighting"
+    fi
+
+    # Update .zshrc to enable plugins
+    sed -i 's/^plugins=(.*/plugins=(git zsh-autocomplete zsh-autosuggestions zsh-syntax-highlighting)/' "$base_files_path/root/.zshrc"
+}
+
+add_awg() {
+    local awg_dir="$BUILD_DIR/package/awg-openwrt"
+    local repo_url="https://github.com/Slava-Shchipunov/awg-openwrt"
+    # 删除旧的目录（如果存在）
+    rm -rf "$awg_dir" 2>/dev/null
+    echo "正在添加 awg-openwrt..."
+    if ! git clone --depth 1 "$repo_url" "$awg_dir" -b master; then
+        echo "错误：从 $repo_url 克隆 awg-openwrt 仓库失败" >&2
+        exit 1
+    fi
+}
+
+fix_node_build() {
+    # build node in single thread to avoid out of memory
+    local node_makefile="$BUILD_DIR/feeds/packages/lang/node/Makefile"
+    if [ -f "$node_makefile" ]; then
+        # 禁止并行编译，避免 OOM
+        if ! grep -q "^PKG_BUILD_PARALLEL:=0" "$node_makefile"; then
+            sed -i '/^PKG_NAME:=node/a PKG_BUILD_PARALLEL:=0' "$node_makefile"
+        else
+            echo "PKG_BUILD_PARALLEL already set to 0 in $node_makefile"
+        fi
+    fi
+}
+
+fix_libffi() {
+    local original_makefile="$BUILD_DIR/package/feeds/packages/libffi/Makefile"
+    if [ -f "$original_makefile" ]; then
+        echo "Restoring original libffi Makefile from openwrt..."
+        curl -fsSL -o "$original_makefile" "https://raw.githubusercontent.com/openwrt/packages/refs/heads/openwrt-24.10/libs/libffi/Makefile"
+    fi
+    update_package "libffi" "releases" "v3.5.2" || exit 1
+}
+
+tailscale_use_awg() {
+    local tailscale_makefile="$BUILD_DIR/package/feeds/small8/tailscale/Makefile"
+    if [ -f "$tailscale_makefile" ]; then
+        sed -i 's|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=https://codeload.github.com/LiuTangLei/tailscale/tar.gz/v$(PKG_VERSION)?|' "$tailscale_makefile"
+        update_package "tailscale" "releases" "v1.88.3" || exit 1
+    fi
+}
+
+# 统一运行步骤并在失败时退出，便于日志追踪
+run_steps() {
+    local fn="$1"
+    echo "================================================================"
+    echo "==> STEP: ${fn}"
+    echo "================================================================"
+    if ! ${fn}; then
+        echo "Error: step ${fn} failed" >&2
+        exit 1
+    fi
+}
+
 main() {
+    # 定义颜色常量
+    local BLUE='\033[1;34m'
+    local GREEN='\033[1;32m'
+    local YELLOW='\033[1;33m'
+    local RED='\033[1;31m'
+    local NC='\033[0m' # No Color
+    
+    clear
+    # 打印开始信息
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${YELLOW}编译目录: ${BUILD_DIR}, 配置文件: ${CONFIG_FILE} ${NC}"
+    echo -e "${BLUE}开始执行更新流程...${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    
+    # 启用 DEBUG trap 来跟踪函数执行
+    trap '[[ "$BASH_COMMAND" != "main" ]] && [[ "$BASH_COMMAND" != "trap"* ]] && echo -e "${BLUE}==>${NC} ${GREEN}${BASH_COMMAND%% *}${NC}"' DEBUG
+    
     clone_repo
     clean_up
     reset_feeds_conf
     update_feeds
     remove_unwanted_packages
     remove_tweaked_packages
-    update_homeproxy
+    update_base_files
+    # update_homeproxy
     fix_default_set
     fix_miniupnpd
     update_golang
@@ -1049,44 +1290,51 @@ main() {
     update_affinity_script
     update_ath11k_fw
     # fix_mkpkg_format_invalid
-    change_cpuusage
-    update_tcping
+    # change_cpuusage
+    # update_tcping
     add_ax6600_led
     set_custom_task
-    apply_passwall_tweaks
+    # apply_passwall_tweaks
     update_nss_pbuf_performance
     set_build_signature
     update_nss_diag
     update_menu_location
     fix_compile_coremark
-    update_dnsmasq_conf
+    # update_dnsmasq_conf
     add_backup_info_to_sysupgrade
-    update_mosdns_deconfig
-    fix_quickstart
-    update_oaf_deconfig
-    add_timecontrol
+    # update_mosdns_deconfig
+    # fix_quickstart
+    # update_oaf_deconfig
+    # add_timecontrol
     add_gecoosac
     add_quickfile
-    update_lucky
+    # update_lucky
     fix_rust_compile_error
-    update_smartdns
+    # update_smartdns
     update_diskman
     set_nginx_default_config
     update_uwsgi_limit_as
-    update_argon
+    # update_argon
     update_nginx_ubus_module # 更新 nginx-mod-ubus 模块
     check_default_settings
     install_opkg_distfeeds
     install_feeds
-    fix_easytier_lua
-    update_adguardhome
+    # fix_easytier_lua
+    # update_adguardhome
     update_script_priority
     update_geoip
-    update_package "runc" "releases" "v1.2.6"
-    update_package "containerd" "releases" "v1.7.27"
-    update_package "docker" "tags" "v28.2.2"
-    update_package "dockerd" "releases" "v28.2.2"
+    update_packages
+    # add_ohmyzsh
+    add_awg
+    fix_node_build
+    fix_libffi
+    # tailscale_use_awg
     # apply_hash_fixes # 调用哈希修正函数
+
+    trap - DEBUG
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${GREEN}所有更新步骤已完成。${NC}"
+    echo -e "${BLUE}========================================${NC}"
 }
 
 main "$@"
