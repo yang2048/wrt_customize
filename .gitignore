@@ -22,4 +22,5 @@ xray-client.json
 xray-server.json
 .clineignore
 update.sh.bak
-logs/
+dts/
+*.log
