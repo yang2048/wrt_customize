@@ -23,4 +23,7 @@ xray-server.json
 .clineignore
 update.sh.bak
 dts/
+<<<<<<< HEAD
 *.log
+=======
+>>>>>>> 0844132 (feat: Add initial support for Gemtek W1701K router)

@@ -121,9 +121,9 @@ fi
 
 # 本地运行
 echo "开始下载 [$(date "+%Y-%m-%d_%H-%M-%S")]"
-make download -j 10 TIMEOUT=30 RETRY=3 PKG_MIRROR_HASH:=
+make download -j 8 TIMEOUT=30 RETRY=3 PKG_MIRROR_HASH:= 2>&1 | tee ../logs/build-$(date "+%Y-%m-%d_%H").log || make download -j5 || make download -j3 || make download -j2 || exit 1
 echo "✅ 下载结束 [$(date "+%Y-%m-%d_%H-%M-%S")]"
-make -j 6 FORCE_UNSAFE_CONFIGURE=1 PKG_MIRROR_HASH:= 2>&1 | tee ../logs/build-$(date "+%Y-%m-%d_%H-%M-%S").log
+make -j 5 FORCE_UNSAFE_CONFIGURE=1 PKG_MIRROR_HASH:= 2>&1 | tee ../logs/build-$(date "+%Y-%m-%d_%H").log
 
 FIRMWARE_DIR="$BASE_PATH/firmware"
 \rm -rf "$FIRMWARE_DIR"
