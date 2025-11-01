@@ -35,13 +35,8 @@ EOF
 }
 
 jdc_ax1800_pro_wifi_cfg() {
-<<<<<<< HEAD
-    configure_wifi 0 149 HE80 20 'WRT_5G' '12345678'
-    configure_wifi 1 1 HE20 20 'WRT' '12345678'
-=======
-	configure_wifi 0 149 HE80 20 'JDC_AX1800PRO_5G' '12345678'
-	configure_wifi 1 1 HE20 20 'JDC_AX1800PRO' '12345678'
->>>>>>> 0844132 (feat: Add initial support for Gemtek W1701K router)
+    configure_wifi 0 149 HE80 20 'CMCC_5G' '12345678'
+    configure_wifi 1 1 HE20 20 'CMCC' '12345678'
 }
 
 jdc_ax6600_wifi_cfg() {
@@ -121,15 +116,6 @@ qihoo,360v6)
 	qihoo_360v6_wifi_cfg
 	;;
 linksys,mx4200v1 | \
-<<<<<<< HEAD
-    linksys,mx4200v2 | \
-    linksys,mx4300)
-    linksys_mx4x00_wifi_cfg
-    ;;
-gemtek,w1701k)
-    gemtek_w1701k_wifi_cfg
-    ;;
-=======
 	linksys,mx4200v2 | \
 	linksys,mx4300)
 	linksys_mx4x00_wifi_cfg
@@ -137,7 +123,6 @@ gemtek,w1701k)
 gemtek,w1701k)
 	gemtek_w1701k_wifi_cfg
 	;;
->>>>>>> 0844132 (feat: Add initial support for Gemtek W1701K router)
 *)
 	exit 0
 	;;

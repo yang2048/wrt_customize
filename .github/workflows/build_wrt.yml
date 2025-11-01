@@ -71,10 +71,10 @@ jobs:
 
       - name: Build System Setup(系统环境设置)
         run: |
-          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-          sudo -E apt -yqq install dos2unix libfuse-dev
-          sudo -E apt -yqq autoclean
-          sudo -E apt -yqq clean
+          sudo apt update -y
+          sudo apt full-upgrade -y
+          sudo apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint ccache cmake clang zstd jq curl wget vim ninja-build llvm lrzsz
+          sudo -E apt -yqq install dos2unix libfuse-dev autoclean clean
           sudo -E systemctl daemon-reload
 
       - name: Set Build Date and Timezone(设置编译日期和时区)

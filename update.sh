@@ -102,7 +102,7 @@ update_feeds() {
     # 检查并添加 kwrt 源
     add_feeds "kiddin9" "https://github.com/kiddin9/kwrt-packages.git"
     # 检查并添加 AWG-OpenWRT 源
-    add_feeds "awg" "https://github.com/Slava-Shchipunov/awg-openwrt"
+    # add_feeds "awg" "https://github.com/Slava-Shchipunov/awg-openwrt"
     # 检查并添加 opentopd 源
     # add_feeds "opentopd" "https://github.com/sirpdboy/sirpdboy-package"
     # 检查并添加 node 源
@@ -220,10 +220,10 @@ install_small8() {
 
 install_fullconenat() {
     if [ ! -d $BUILD_DIR/package/network/utils/fullconenat-nft ]; then
-        ./scripts/feeds install -p kiddin9 -f fullconenat-nft
+        ./scripts/feeds install -p small8 -f fullconenat-nft
     fi
     if [ ! -d $BUILD_DIR/package/network/utils/fullconenat ]; then
-        ./scripts/feeds install -p kiddin9 -f fullconenat
+        ./scripts/feeds install -p small8 -f fullconenat
     fi
 }
 
@@ -234,12 +234,11 @@ install_opentopd() {
 }
 
 install_kiddin9() {
-    ./scripts/feeds install -p kiddin9 -f xray-core xray-plugin dns2tcp dns2socks hysteria naiveproxy shadowsocks-rust sing-box \
-        v2ray-plugin tuic-client chinadns-ng ipt2socks geoview tcping trojan-plus simple-obfs shadowsocksr-libev v2dat luci-lib-xterm \
+    ./scripts/feeds install -p kiddin9 -f tcping ipt2socks luci-lib-xterm bandix luci-app-bandix apfree-wifidog luci-app-apfree-wifidog\
         luci-app-advancedplus luci-app-unishare unishare taskd luci-lib-taskd luci-app-store quickstart luci-app-quickstart \
         lucky luci-app-lucky luci-app-openclash luci-app-amlogic oaf open-app-filter luci-app-oaf easytier luci-app-easytier \
-        tailscale luci-app-tailscale luci-theme-argon luci-app-samba4 mosdns luci-app-mosdns luci-app-wol mihomo \
-        luci-app-adguardhome luci-app-taskplan
+        tailscale luci-app-tailscale luci-theme-argon luci-app-samba4 mosdns luci-app-mosdns luci-app-wol \
+        luci-app-adguardhome luci-app-taskplan 
 }
 
 install_node() {
@@ -588,7 +587,7 @@ set_build_signature() {
     date_version=$(date +"%y.%m.%d")
     local file="$BUILD_DIR/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js"
     if [ -d "$(dirname "$file")" ] && [ -f $file ]; then
-        sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ build by Y.Y R$date_version')/g" "$file"
+        sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ Build by Y.Y \/ R$date_version')/g" "$file"
     fi
 }
 
@@ -606,13 +605,13 @@ update_menu_location() {
         sed -i 's/nas/services/g' "$samba4_path"
     fi
 
-    local tailscale_path="$BUILD_DIR/feeds/small8/luci-app-tailscale/root/usr/share/luci/menu.d/luci-app-tailscale.json"
+    local tailscale_path="$BUILD_DIR/feeds/kiddin9/luci-app-tailscale/root/usr/share/luci/menu.d/luci-app-tailscale.json"
     if [ -d "$(dirname "$tailscale_path")" ] && [ -f "$tailscale_path" ]; then
         sed -i 's/services/vpn/g' "$tailscale_path"
     fi
 
     # passwall
-    local passwall_path="$BUILD_DIR/package/feeds/small8/luci-app-passwall/luasrc/controller/passwall.lua"
+    local passwall_path="$BUILD_DIR/package/feeds/kiddin9/luci-app-passwall/luasrc/controller/passwall.lua"
     if [ -d "${passwall_path%/*}" ] && [ -f "$passwall_path" ]; then
         local pos=$(grep -n "entry" "$passwall_path" | head -n 1 | awk -F ":" '{print $1}')
         if [ -n "$pos" ]; then
@@ -621,7 +620,7 @@ update_menu_location() {
         fi
     fi
     # passwall2
-    local passwall2_path="$BUILD_DIR/package/feeds/small8/luci-app-passwall2/luasrc/controller/passwall2.lua"
+    local passwall2_path="$BUILD_DIR/package/feeds/kiddin9/luci-app-passwall2/luasrc/controller/passwall2.lua"
     if [ -d "${passwall2_path%/*}" ] && [ -f "$passwall2_path" ]; then
         local pos=$(grep -n "entry" "$passwall2_path" | head -n 1 | awk -F ":" '{print $1}')
         if [ -n $pos ]; then
@@ -631,13 +630,13 @@ update_menu_location() {
     fi
 
     # homeproxy
-    local homeproxy_path="$BUILD_DIR/package/feeds/small8/luci-app-homeproxy/root/usr/share/luci/menu.d/luci-app-homeproxy.json"
+    local homeproxy_path="$BUILD_DIR/package/feeds/kiddin9/luci-app-homeproxy/root/usr/share/luci/menu.d/luci-app-homeproxy.json"
     if [ -d "${homeproxy_path%/*}" ] && [ -f "$homeproxy_path" ]; then
         sed -i 's/\/services\//\/proxy\//g' "$homeproxy_path"
     fi
 
     # nikki
-    local nikki_path="$BUILD_DIR/package/feeds/small8/luci-app-nikki/root/usr/share/luci/menu.d/luci-app-nikki.json"
+    local nikki_path="$BUILD_DIR/package/feeds/kiddin9/luci-app-nikki/root/usr/share/luci/menu.d/luci-app-nikki.json"
     if [ -d "${nikki_path%/*}" ] && [ -f "$nikki_path" ]; then
         sed -i 's/\/services\//\/proxy\//g' "$nikki_path"
     fi
@@ -786,14 +785,14 @@ function update_script_priority() {
     fi
 
     # 更新mosdns服务的启动顺序
-    local mosdns_path="$BUILD_DIR/package/feeds/small8/luci-app-mosdns/root/etc/init.d/mosdns"
+    local mosdns_path="$BUILD_DIR/package/feeds/kiddin9/luci-app-mosdns/root/etc/init.d/mosdns"
     if [ -d "${mosdns_path%/*}" ] && [ -f "$mosdns_path" ]; then
         sed -i 's/START=.*/START=94/g' "$mosdns_path"
     fi
 }
 
 update_mosdns_deconfig() {
-    local mosdns_conf="$BUILD_DIR/feeds/small8/luci-app-mosdns/root/etc/config/mosdns"
+    local mosdns_conf="$BUILD_DIR/feeds/kiddin9/luci-app-mosdns/root/etc/config/mosdns"
     if [ -d "${mosdns_conf%/*}" ] && [ -f "$mosdns_conf" ]; then
         sed -i 's/8000/300/g' "$mosdns_conf"
         sed -i 's/5335/5336/g' "$mosdns_conf"
@@ -866,7 +865,7 @@ add_gecoosac() {
 }
 
 update_adguardhome() {
-    local adguardhome_dir="$BUILD_DIR/package/feeds/small8/luci-app-adguardhome"
+    local adguardhome_dir="$BUILD_DIR/package/feeds/kiddin9/luci-app-adguardhome"
     local repo_url="https://github.com/ZqinKing/luci-app-adguardhome.git"
 
     echo "正在更新 luci-app-adguardhome..."
@@ -1055,7 +1054,7 @@ EOF
     if [ -f "$nginx_template" ]; then
         # 检查是否已存在配置，避免重复添加
         if ! grep -q "client_body_in_file_only clean;" "$nginx_template"; then
-            sed -i "/client_max_body_size 128M;/a\\
+            sed -i "/client_max_body_size 1024M;/a\\
 \tclient_body_in_file_only clean;\\
 \tclient_body_temp_path /mnt/tmp;" "$nginx_template"
         fi
@@ -1128,7 +1127,7 @@ update_argon() {
 }
 
 fix_easytier_lua() {
-    local file_path="$BUILD_DIR/package/feeds/small8/luci-app-easytier/luasrc/model/cbi/easytier.lua"
+    local file_path="$BUILD_DIR/package/feeds/kiddin9/luci-app-easytier/luasrc/model/cbi/easytier.lua"
     if [ -f "$file_path" ]; then
         sed -i 's/util.pcdata/xml.pcdata/g' "$file_path"
     fi
@@ -1302,7 +1301,7 @@ main() {
     fix_compile_coremark
     # update_dnsmasq_conf
     add_backup_info_to_sysupgrade
-    # update_mosdns_deconfig
+    update_mosdns_deconfig
     # fix_quickstart
     # update_oaf_deconfig
     # add_timecontrol
@@ -1314,20 +1313,20 @@ main() {
     update_diskman
     set_nginx_default_config
     update_uwsgi_limit_as
-    # update_argon
+    update_argon
     update_nginx_ubus_module # 更新 nginx-mod-ubus 模块
     check_default_settings
     install_opkg_distfeeds
     install_feeds
-    # fix_easytier_lua
+    fix_easytier_lua
     # update_adguardhome
     update_script_priority
-    update_geoip
+    # update_geoip
     update_packages
     # add_ohmyzsh
-    add_awg
+    # add_awg
     fix_node_build
-    fix_libffi
+    # fix_libffi
     # tailscale_use_awg
     # apply_hash_fixes # 调用哈希修正函数
 
